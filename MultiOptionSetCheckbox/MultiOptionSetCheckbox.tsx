@@ -4,6 +4,7 @@ import { Checkbox } from '@fluentui/react-components';
 export interface IMultiOptionSetCheckboxProps {
     options: any[];
     selected: number[];
+    disabled: boolean;
     columns: number;
     rows: number;
     orderBy: string;
@@ -14,7 +15,7 @@ export interface IMultiOptionSetCheckboxProps {
 
 }
 
-const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, direction, startAt, orientation, onChange }: IMultiOptionSetCheckboxProps) => {
+const MultiOptionSetCheckbox = ({ options, selected, disabled, columns, rows, orderBy, direction, startAt, orientation, onChange }: IMultiOptionSetCheckboxProps) => {
     const [splitOptions, setSplitOptions] = React.useState([] as any);
     const [calcColumns, setColumns] = React.useState(columns);
     const [calcRows, setRows] = React.useState(rows);
@@ -75,6 +76,7 @@ const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, dir
     };
 
     const handleCheckboxChange = (option: any) => {
+        if (disabled) return;
         const updatedSelected = [...selected];
         const index = updatedSelected.indexOf(option.Value);
         if (index > -1) {
@@ -93,6 +95,7 @@ const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, dir
                         <Checkbox
                         label={option.Label}
                         checked={selected.includes(option.Value)}
+                        disabled={disabled}
                         onChange={() => handleCheckboxChange(option)}
                         />
                     )}

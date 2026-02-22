@@ -42,25 +42,42 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
      * Called when any value in the property bag has changed. This includes field values, data-sets, global values such as container height and width, offline status, control metadata values such as label, visible, etc.
      * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
      */
+    
     public updateView(context: ComponentFramework.Context<IInputs>): void
     {
+        // Always use the latest context passed by the framework
+        this._context = context;
+
+        // Rehydrate options + selected values every time (fixes inconsistent initial load)
+        this._options = context.parameters.MultiSelectColumn.attributes?.Options || [];
+        this._selected = [...(context.parameters.MultiSelectColumn.raw || [])];
+
+        // Respect read-only/disabled state
+        const isDisabled = context.mode.isControlDisabled;
+
         ReactDOM.render(
             React.createElement(MultiOptionSetCheckbox, {
                 options: this._options,
                 selected: this._selected,
-                columns: this._context.parameters.Columns.raw || 1,
-                rows: this._context.parameters.Rows.raw || Math.ceil(this._options.length / (this._context.parameters.Columns.raw || 1)),
-                orderBy: this._context.parameters.OrderBy.raw,
-                direction: this._context.parameters.Direction.raw,
-                startAt: this._context.parameters.Startat.raw,
-                orientation: this._context.parameters.Orientation.raw,
+                disabled: isDisabled,
+                columns: context.parameters.Columns.raw || 1,
+                rows: context.parameters.Rows.raw || Math.ceil(this._options.length / (context.parameters.Columns.raw || 1)),
+                orderBy: context.parameters.OrderBy.raw,
+                direction: context.parameters.Direction.raw,
+                startAt: context.parameters.Startat.raw,
+                orientation: context.parameters.Orientation.raw,
                 onChange: (selected) => {
+                    // Block updates when form/control is read-only
+                    if (isDisabled) return;
+
                     this._selected = selected;
                     this._notifyOutputChanged();
                 }
-            } as IMultiOptionSetCheckboxProps), this._container
+            } as IMultiOptionSetCheckboxProps),
+            this._container
         );
     }
+
 
     /**
      * It is called by the framework prior to a control receiving new data.
