@@ -10,6 +10,15 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
     private _options: any[] = [];
     private _selected: number[] = [];
 
+    private arraysEqual(a: number[], b: number[]): boolean {
+    if (a === b) return true;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+    }
+
     private _notifyOutputChanged: () => void;
 
     /**
@@ -48,12 +57,27 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
         // Always use the latest context passed by the framework
         this._context = context;
 
-        // Rehydrate options + selected values every time (fixes inconsistent initial load)
+        // Rehydrate options every time
         this._options = context.parameters.MultiSelectColumn.attributes?.Options || [];
-        this._selected = [...(context.parameters.MultiSelectColumn.raw || [])];
 
-        // Respect read-only/disabled state
-        const isDisabled = context.mode.isControlDisabled;
+        // Rehydrate selected values, BUT don't clobber when not loaded yet
+        const rawSelected = context.parameters.MultiSelectColumn.raw;
+
+        // IMPORTANT:
+        // - undefined => not loaded yet (do NOT overwrite current selection)
+        // - null      => loaded and empty (treat as empty selection)
+        if (rawSelected !== undefined) {
+            const nextSelected = rawSelected ?? [];
+            if (!this.arraysEqual(nextSelected, this._selected)) {
+                // Assign directly (avoid creating a new array reference each updateView)
+                this._selected = nextSelected;
+            }
+        }
+
+        // Respect read-only/disabled state AND field security editability
+        const isDisabled =
+            context.mode.isControlDisabled ||
+            !context.parameters.MultiSelectColumn.security?.editable;
 
         ReactDOM.render(
             React.createElement(MultiOptionSetCheckbox, {
@@ -61,15 +85,14 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
                 selected: this._selected,
                 disabled: isDisabled,
                 columns: context.parameters.Columns.raw || 1,
-                rows: context.parameters.Rows.raw || Math.ceil(this._options.length / (context.parameters.Columns.raw || 1)),
+                rows: context.parameters.Rows.raw ||
+                    Math.ceil(this._options.length / (context.parameters.Columns.raw || 1)),
                 orderBy: context.parameters.OrderBy.raw,
                 direction: context.parameters.Direction.raw,
                 startAt: context.parameters.Startat.raw,
                 orientation: context.parameters.Orientation.raw,
                 onChange: (selected) => {
-                    // Block updates when form/control is read-only
                     if (isDisabled) return;
-
                     this._selected = selected;
                     this._notifyOutputChanged();
                 }

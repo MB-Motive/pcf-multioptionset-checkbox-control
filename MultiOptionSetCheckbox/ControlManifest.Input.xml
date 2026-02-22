@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="WareTec" constructor="MultiOptionsetCheckbox" version="0.0.2"
+  <control namespace="WareTec" constructor="MultiOptionsetCheckbox" version="0.0.3"
     display-name-key="Multi Optionset Checkbox"
     description-key="Multi Optionset Checkbox" control-type="standard">
     <external-service-usage enabled="false">
