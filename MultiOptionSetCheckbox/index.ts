@@ -9,10 +9,18 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
     private _container: HTMLDivElement;
     private _options: any[] = [];
     private _selected: number[] = [];
-
     private _notifyOutputChanged: () => void;
 
     constructor() { }
+
+    private arraysEqual(a: number[], b: number[]): boolean {
+        if (a === b) return true;
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (a[i] !== b[i]) return false;
+        }
+        return true;
+    }
 
     public init(
         context: ComponentFramework.Context<IInputs>,
@@ -24,25 +32,33 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
 
-        // Only load options here (they don't change). Do NOT cache _selected here —
-        // the field value may not be loaded yet at init time.
+        // Load options in init — they are available immediately and don't change.
+        // Do NOT cache _selected here; field data may not be loaded yet at init time.
         this._options = context.parameters.MultiSelectColumn.attributes?.Options || [];
     }
 
     public updateView(context: ComponentFramework.Context<IInputs>): void {
         this._context = context;
 
-        // FIX 1: Always read the current selected values from context in updateView,
-        // not from a value cached during init. This ensures that when the form loads
-        // and populates the field, the control reflects the correct selections.
-        const rawValue = context.parameters.MultiSelectColumn.raw;
-        this._selected = Array.isArray(rawValue) ? rawValue : [];
+        // Rehydrate options every updateView cycle.
+        this._options = context.parameters.MultiSelectColumn.attributes?.Options || [];
 
-        // FIX 2: Read the disabled state from context so the control correctly
-        // becomes read-only when the form is deactivated or the field is locked.
+        // Rehydrate selected values with a precise undefined/null distinction:
+        //   undefined => field data not loaded yet — do NOT overwrite current selection.
+        //   null      => field loaded and is empty — treat as empty array.
+        const rawSelected = context.parameters.MultiSelectColumn.raw;
+        if (rawSelected !== undefined) {
+            const nextSelected = rawSelected ?? [];
+            if (!this.arraysEqual(nextSelected, this._selected)) {
+                this._selected = nextSelected;
+            }
+        }
+
+        // Respect form disabled state and field-level security.
+        // Uses .editable (not .readable) — the correct property for write access.
         const isDisabled =
             context.mode.isControlDisabled ||
-            context.parameters.MultiSelectColumn.security?.readable === false;
+            !context.parameters.MultiSelectColumn.security?.editable;
 
         ReactDOM.render(
             React.createElement(MultiOptionSetCheckbox, {
@@ -50,12 +66,15 @@ export class MultiOptionsetCheckbox implements ComponentFramework.StandardContro
                 selected: this._selected,
                 disabled: isDisabled,
                 columns: context.parameters.Columns.raw || 1,
-                rows: context.parameters.Rows.raw ?? Math.ceil(this._options.length / (context.parameters.Columns.raw || 1)),
+                rows: context.parameters.Rows.raw ||
+                    Math.ceil(this._options.length / (context.parameters.Columns.raw || 1)),
                 orderBy: context.parameters.OrderBy.raw,
                 direction: context.parameters.Direction.raw,
                 startAt: context.parameters.Startat.raw,
                 orientation: context.parameters.Orientation.raw,
                 onChange: (selected: number[]) => {
+                    // Belt-and-suspenders guard in addition to the TSX-level guard.
+                    if (isDisabled) return;
                     this._selected = selected;
                     this._notifyOutputChanged();
                 }
