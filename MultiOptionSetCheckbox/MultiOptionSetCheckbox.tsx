@@ -4,6 +4,7 @@ import { Checkbox } from '@fluentui/react-components';
 export interface IMultiOptionSetCheckboxProps {
     options: any[];
     selected: number[];
+    disabled: boolean;
     columns: number;
     rows: number;
     orderBy: string;
@@ -11,13 +12,20 @@ export interface IMultiOptionSetCheckboxProps {
     startAt: string;
     orientation: string;
     onChange: (selected: number[]) => void;
-
 }
 
-const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, direction, startAt, orientation, onChange }: IMultiOptionSetCheckboxProps) => {
+const MultiOptionSetCheckbox = ({ options, selected, disabled, columns, rows, orderBy, direction, startAt, orientation, onChange }: IMultiOptionSetCheckboxProps) => {
     const [splitOptions, setSplitOptions] = React.useState([] as any);
     const [calcColumns, setColumns] = React.useState(columns);
     const [calcRows, setRows] = React.useState(rows);
+
+    // Normalise selected values to Numbers once per render so that the checked
+    // state comparison is always type-safe. The PCF runtime can surface option
+    // Values as strings in some versions, causing strict equality checks to fail.
+    const normalizedSelected = React.useMemo(
+        () => (selected ?? []).map(v => Number(v)),
+        [selected]
+    );
 
     React.useEffect(() => {
         let sortedOptions = [...options];
@@ -33,8 +41,12 @@ const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, dir
             splitOptionsFunction(sortedOptions, startAt, orientation);
         } else {
             setSplitOptions(sortedOptions);
+            // Reset grid dimensions to prop values when startAt is not in use,
+            // preventing stale dimensions left over from a previous splitAt calculation.
+            setColumns(columns);
+            setRows(rows);
         }
-    }, [options, orderBy, direction, startAt, orientation]);
+    }, [options, orderBy, direction, startAt, orientation, columns, rows]);
 
     const splitOptionsFunction = (options: any, startAt: any, orientation: any) => {
         // Sort options alphabetically
@@ -75,12 +87,18 @@ const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, dir
     };
 
     const handleCheckboxChange = (option: any) => {
+        // Belt-and-suspenders guard — isDisabled is also enforced in index.ts onChange.
+        if (disabled) return;
+
         const updatedSelected = [...selected];
-        const index = updatedSelected.indexOf(option.Value);
+        // Coerce both sides to Number to avoid string/number mismatch when finding
+        // and removing an existing selection, which could otherwise cause duplicates.
+        const optionValue = Number(option.Value);
+        const index = updatedSelected.findIndex(v => Number(v) === optionValue);
         if (index > -1) {
             updatedSelected.splice(index, 1);
         } else {
-            updatedSelected.push(option.Value);
+            updatedSelected.push(optionValue);
         }
         onChange(updatedSelected);
     };
@@ -91,9 +109,12 @@ const MultiOptionSetCheckbox = ({ options, selected, columns, rows, orderBy, dir
                 <div key={index}>
                     {option && (
                         <Checkbox
-                        label={option.Label}
-                        checked={selected.includes(option.Value)}
-                        onChange={() => handleCheckboxChange(option)}
+                            label={option.Label}
+                            // Use normalizedSelected and coerce option.Value to Number
+                            // so the checked comparison is always type-safe.
+                            checked={normalizedSelected.includes(Number(option.Value))}
+                            disabled={disabled}
+                            onChange={() => handleCheckboxChange(option)}
                         />
                     )}
                 </div>
